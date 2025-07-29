@@ -17,7 +17,12 @@ pub async fn run(
 
     let response: CreateInteractionResponse = CreateInteractionResponse::Message(
         CreateInteractionResponseMessage::new()
-            .content("Reloaded config!")
+            .embed(
+                CreateEmbed::new()
+                    .title("Reloaded config!")
+                    .description("New settings have been applied")
+                    .color(2326507),
+            )
             .ephemeral(true),
     );
     if let Err(err) = command.create_response(&ctx, response).await {

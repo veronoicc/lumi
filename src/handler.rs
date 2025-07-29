@@ -63,17 +63,19 @@ impl EventHandler for Handler {
                         .map_err(Into::into)
                 }
             };
-            if let Err(err) = res {
+            if let Err(err1) = res {
                 let response: CreateInteractionResponse = CreateInteractionResponse::Message(
                     CreateInteractionResponseMessage::new()
-                        .content(format!(
-                            "Encountered an error while executing command:\n```\n{}\n```",
-                            err.to_string()
-                        ))
+                        .embed(
+                            CreateEmbed::new()
+                                .title("Encountered an error in command handler")
+                                .description(format!("```\n{err1:?}\n```"))
+                                .color(15409955),
+                        )
                         .ephemeral(true),
                 );
-                if let Err(err) = command.create_response(&ctx.http, response).await {
-                    println!("Error responding to slash command: {err:?}");
+                if let Err(err2) = command.create_response(&ctx.http, response).await {
+                    println!("Fatal error: {err1:?} {err2:?}");
                 }
             }
         }
@@ -174,7 +176,12 @@ impl EventHandler for Handler {
                     .send_message(
                         &ctx,
                         CreateMessage::new()
-                            .content(format!("Encountered an error:\n```\n{err:?}\n```"))
+                            .embed(
+                                CreateEmbed::new()
+                                    .title("Encountered an error")
+                                    .description(format!("```\n{err:?}\n```"))
+                                    .color(15409955),
+                            )
                             .allowed_mentions(CreateAllowedMentions::new()),
                     )
                     .await

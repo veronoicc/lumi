@@ -34,7 +34,7 @@ pub async fn run(
         .bind(command.channel_id.get() as i64)
         .execute(&handler.db)
         .await?;
-        format!("Set Lumi's system prompt to '`{}`'", prompt.name)
+        format!("Set Lumi's system prompt to *{}*", prompt.name)
     } else {
         let current_prompt: Option<db::SystemPrompt> = sqlx::query_as(indoc! {"
             SELECT sp.*
@@ -46,10 +46,7 @@ pub async fn run(
         .fetch_optional(&handler.db)
         .await?;
         if let Some(current_prompt) = current_prompt {
-            format!(
-                "Lumi's current system prompt is '`{}`'",
-                current_prompt.name
-            )
+            format!("Lumi's current system prompt is *{}*", current_prompt.name)
         } else {
             "Lumi does not have a system prompt set for this channel".into()
         }
@@ -57,7 +54,12 @@ pub async fn run(
 
     let response: CreateInteractionResponse = CreateInteractionResponse::Message(
         CreateInteractionResponseMessage::new()
-            .content(response)
+            .embed(
+                CreateEmbed::new()
+                    .title("System prompt")
+                    .description(response)
+                    .color(2326507),
+            )
             .ephemeral(false),
     );
     if let Err(err) = command.create_response(&ctx, response).await {

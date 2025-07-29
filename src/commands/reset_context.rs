@@ -12,7 +12,12 @@ pub async fn run(
     reset_context(&command.channel_id, &handler.db).await?;
     let response: CreateInteractionResponse = CreateInteractionResponse::Message(
         CreateInteractionResponseMessage::new()
-            .content("Reset context!")
+            .embed(
+                CreateEmbed::new()
+                    .title("Reset context!")
+                    .description("Lumi will not remember any messages before this point")
+                    .color(2326507),
+            )
             .ephemeral(false),
     );
     if let Err(err) = command.create_response(&ctx, response).await {
