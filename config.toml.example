@@ -1,0 +1,23 @@
+[database]
+url = ""
+
+[discord]
+bot_token = ""
+
+[openrouter]
+api_key = ""
+# Whenever this threshold is reached, the oldest n/2 messages are removed from context
+window_threshold = 64
+# The number of times to retry social orchestrator requests if invalid JSON is received, does nothing if set to 1 or less
+max_attempts = 3
+
+# Main user-facing conversational chatbot
+[openrouter.chat]
+model = "moonshotai/kimi-k2"
+# model = "google/gemini-2.5-flash-lite"
+reasoning = { enabled = false }
+
+# Decides which messages the chatbot should respond to
+[openrouter.social]
+model = "google/gemini-2.5-flash-lite"
+reasoning = { effort = "low", exclude = true, enabled = true }
