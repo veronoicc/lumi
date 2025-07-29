@@ -36,7 +36,7 @@ jobs:
     
     - name: Fetch from upstream remote
       run: |
-        git fetch upstream
+        git fetch --all
     
     - name: Switch to upstream branch
       run: |
