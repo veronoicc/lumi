@@ -27,7 +27,7 @@ pub async fn run(
         .bind(&new_mode)
         .execute(&handler.db)
         .await?;
-        format!("Updated Lumi's chat mode to {}", new_mode.to_string())
+        format!("Updated Lumi's chat mode to *{}*", new_mode.to_string())
     } else {
         let channel: Option<db::Channel> = sqlx::query_as(indoc! {"
             SELECT *
@@ -39,7 +39,7 @@ pub async fn run(
         .await?;
         if let Some(channel) = channel {
             format!(
-                "Lumi's current chat mode is {}",
+                "Lumi's current chat mode is *{}*",
                 channel.chat_mode.to_string()
             )
         } else {
@@ -49,7 +49,12 @@ pub async fn run(
 
     let response: CreateInteractionResponse = CreateInteractionResponse::Message(
         CreateInteractionResponseMessage::new()
-            .content(response)
+            .embed(
+                CreateEmbed::new()
+                    .title("Chat mode")
+                    .description(response)
+                    .color(2326507),
+            )
             .ephemeral(false),
     );
     if let Err(err) = command.create_response(&ctx, response).await {
