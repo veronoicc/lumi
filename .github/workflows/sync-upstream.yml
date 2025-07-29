@@ -1,0 +1,89 @@
+name: Sync Upstream
+
+on:
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+env:
+  UPSTREAM_REPO: "https://git.shrecked.dev/Shrecknt/lumi.git"
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0 # Fetch all history for all branches
+        token: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Configure Git
+      run: |
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+    
+    - name: Add upstream remote if not exists
+      run: |
+        if ! git remote get-url upstream 2>/dev/null; then
+          echo "Adding upstream remote: ${{ env.UPSTREAM_REPO }}"
+          git remote add upstream ${{ env.UPSTREAM_REPO }}
+        else
+          echo "Upstream remote already exists"
+        fi
+    
+    - name: Fetch from upstream remote
+      run: |
+        git fetch upstream
+    
+    - name: Switch to upstream branch
+      run: |
+        git checkout upstream
+    
+    - name: Check for changes
+      id: check_changes
+      run: |
+        CURRENT_COMMIT=$(git rev-parse HEAD)
+        UPSTREAM_COMMIT=$(git rev-parse upstream/main)
+        echo "current_commit=$CURRENT_COMMIT" >> $GITHUB_OUTPUT
+        echo "upstream_commit=$UPSTREAM_COMMIT" >> $GITHUB_OUTPUT
+        
+        if [ "$CURRENT_COMMIT" = "$UPSTREAM_COMMIT" ]; then
+          echo "has_changes=false" >> $GITHUB_OUTPUT
+          echo "No new changes to sync"
+        else
+          echo "has_changes=true" >> $GITHUB_OUTPUT
+          echo "New changes detected"
+        fi
+    
+    - name: Pull changes from upstream
+      if: steps.check_changes.outputs.has_changes == 'true'
+      run: |
+        git pull upstream main --ff-only
+    
+    - name: Push changes to GitHub
+      if: steps.check_changes.outputs.has_changes == 'true'
+      run: |
+        git push origin upstream
+    
+    - name: Create summary
+      run: |
+        echo "## Upstream Sync Summary" >> $GITHUB_STEP_SUMMARY
+        echo "- **Repository**: ${{ github.repository }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Date**: $(date -u)" >> $GITHUB_STEP_SUMMARY
+        
+        if [ "${{ steps.check_changes.outputs.has_changes }}" = "true" ]; then
+          echo "- **Status**: ✅ Changes synced successfully" >> $GITHUB_STEP_SUMMARY
+          echo "- **Previous commit**: ${{ steps.check_changes.outputs.current_commit }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **New commit**: ${{ steps.check_changes.outputs.upstream_commit }}" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "- **Status**: ⏭️ No changes to sync" >> $GITHUB_STEP_SUMMARY
+        fi
+    
+    - name: Notify on failure
+      if: failure()
+      run: |
+        echo "## ❌ Upstream Sync Failed" >> $GITHUB_STEP_SUMMARY
+        echo "The upstream sync workflow failed. Please check the logs for details." >> $GITHUB_STEP_SUMMARY
