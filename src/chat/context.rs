@@ -1,7 +1,7 @@
 use indoc::indoc;
 use openai_api_rs::v1::chat_completion::{Content as OpenAIContent, *};
 use serenity::all::*;
-use sqlx::{Postgres, Transaction};
+use sqlx::{Postgres, Transaction, prelude::FromRow};
 use tokio::sync::RwLock;
 
 use crate::{Config, chat::social::ShouldReply, db};
@@ -35,22 +35,32 @@ pub async fn build<'d>(
     .fetch_one(&mut **transaction)
     .await?;
 
-    let context: Vec<db::Message> = sqlx::query_as(indoc! {"
-        SELECT m.*,
-            rm.sender_name AS reply_sender_name,
-            rm.contents AS reply_contents
+    let mut context: Vec<MessageWithDetails> = sqlx::query_as(indoc! {"
+        SELECT 
+            m.*, 
+            u.name AS sender_name,
+            u.display_name AS sender_display_name,
+            u.is_self AS is_self,
+            u.is_bot AS is_bot,
+            ru.name AS reply_sender_name,
+            r.contents AS reply_contents
         FROM messages m
-        JOIN channels c ON c.id = m.channel
-        LEFT JOIN messages rm ON rm.id = m.reply
+        JOIN users u ON m.sender = u.id
+        LEFT JOIN messages r ON m.reply = r.id
+        LEFT JOIN users ru ON r.sender = ru.id
+        LEFT JOIN channels c ON m.channel = c.id
         WHERE c.id = $1
             AND m.time > c.context_window
-            AND (m.mentions_self IS TRUE OR $2 IS TRUE)
-        ORDER BY m.id ASC;
+            AND (m.mentions_me IS TRUE OR $2 IS TRUE)
+        ORDER BY m.id DESC
+        LIMIT $3;
     "})
     .bind(channel_id.get() as i64)
     .bind(chat_mode != db::ChatMode::MentionsOnly)
+    .bind(config.read().await.openrouter.window_threshold as i64)
     .fetch_all(&mut **transaction)
     .await?;
+    context.reverse();
 
     if context.len() >= config.read().await.openrouter.window_threshold {
         let middle_index = context.len() / 2;
@@ -62,7 +72,7 @@ pub async fn build<'d>(
                 WHERE id = $1;
             "})
             .bind(channel_id.get() as i64)
-            .bind(middle_message.time as i64)
+            .bind(middle_message.message.time as i64)
             .execute(&mut **transaction)
             .await?;
         }
@@ -90,7 +100,7 @@ pub async fn build<'d>(
     for message in context {
         let built_message = build_contents(&message);
         let (role, contents) = match message.is_self {
-            true => (MessageRole::assistant, &message.contents),
+            true => (MessageRole::assistant, &message.message.contents),
             false => (MessageRole::user, &built_message),
         };
 
@@ -129,7 +139,7 @@ pub async fn build<'d>(
     })
 }
 
-fn build_contents(message: &db::Message) -> String {
+fn build_contents(message: &MessageWithDetails) -> String {
     let mut res = String::new();
     if let Some(reply_contents) = &message.reply_contents {
         let reply_sender_name = message
@@ -148,7 +158,20 @@ fn build_contents(message: &db::Message) -> String {
     }
     res.push_str(&format!(
         "Author Name: {}\nAuthor ID: {}\nContents:\n{}",
-        message.sender_display_name, message.sender_name, message.contents
+        message.sender_display_name, message.sender_name, message.message.contents
     ));
     res
+}
+
+#[derive(FromRow)]
+struct MessageWithDetails {
+    #[sqlx(flatten)]
+    pub message: db::Message,
+    pub is_self: bool,
+    #[allow(unused)]
+    pub is_bot: bool,
+    pub sender_name: String,
+    pub sender_display_name: String,
+    pub reply_sender_name: Option<String>,
+    pub reply_contents: Option<String>,
 }

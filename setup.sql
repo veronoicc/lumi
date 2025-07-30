@@ -33,18 +33,25 @@ CREATE TABLE IF NOT EXISTS channels (
         FOREIGN KEY (system_prompt) REFERENCES system_prompts(id)
 );
 -- break
+CREATE TABLE IF NOT EXISTS users (
+    id BIGINT PRIMARY KEY,
+    name TEXT NOT NULL,
+    display_name TEXT NOT NULL,
+    is_self BOOLEAN NOT NULL,
+    is_bot BOOLEAN NOT NULL
+);
+-- break
 CREATE TABLE IF NOT EXISTS messages (
     id BIGINT PRIMARY KEY,
-    is_self BOOLEAN NOT NULL,
     mentions_me BOOLEAN NOT NULL,
     sender BIGINT NOT NULL,
-    sender_name TEXT NOT NULL,
-    sender_display_name TEXT NOT NULL,
     guild BIGINT,
     channel BIGINT NOT NULL,
     contents TEXT NOT NULL,
     reply BIGINT,
     time BIGINT NOT NULL DEFAULT extract(epoch from now())::bigint,
+    CONSTRAINT fk_sender
+        FOREIGN KEY (sender) REFERENCES users(id),
     CONSTRAINT fk_channel
         FOREIGN KEY (channel) REFERENCES channels(id),
     CONSTRAINT fk_reply
