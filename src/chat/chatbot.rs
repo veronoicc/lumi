@@ -33,7 +33,7 @@ pub async fn generate<'d>(
         return Ok(());
     };
 
-    if content.is_empty() {
+    if content.trim().is_empty() {
         return Ok(());
     }
 
@@ -52,10 +52,18 @@ pub async fn generate<'d>(
     };
     typing.stop();
     sqlx::query(indoc! {"
+        WITH ensured_user AS (
+            INSERT INTO users (id, name, display_name, is_self, is_bot)
+            VALUES ($3, $4, $5, true, true)
+            ON CONFLICT (id) DO UPDATE
+            SET 
+                name = EXCLUDED.name,
+                display_name = EXCLUDED.display_name
+        )
         INSERT INTO messages (
-            id, is_self, mentions_self, sender, sender_name, sender_display_name, guild, channel, contents, reply
+            id, mentions_me, sender, guild, channel, contents, reply
         ) VALUES (
-            $2, true, true, $3, $4, $5, $6, $1, $7, $8
+            $2, true, $3, $6, $1, $7, $8
         );
     "})
     .bind(channel_id.get() as i64)

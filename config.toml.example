@@ -13,8 +13,7 @@ max_attempts = 3
 
 # Main user-facing conversational chatbot
 [openrouter.chat]
-model = "moonshotai/kimi-k2"
-# model = "google/gemini-2.5-flash-lite"
+model = "deepseek/deepseek-chat-v3-0324"
 reasoning = { enabled = false }
 
 # Decides which messages the chatbot should respond to

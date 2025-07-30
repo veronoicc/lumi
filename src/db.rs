@@ -13,20 +13,23 @@ pub struct Channel {
     pub system_prompt: i64,
 }
 
+pub struct User {
+    pub id: u64,
+    pub name: String,
+    pub display_name: String,
+    pub is_self: bool,
+    pub is_bot: bool,
+}
+
 pub struct Message {
     pub id: u64,
-    pub is_self: bool,
-    pub mentions_self: bool,
+    pub mentions_me: bool,
     pub sender: u64,
-    pub sender_name: String,
-    pub sender_display_name: String,
     pub guild: Option<u64>,
     pub channel: u64,
     pub contents: String,
     pub reply: Option<u64>,
     pub time: u64,
-    pub reply_sender_name: Option<String>,
-    pub reply_contents: Option<String>,
 }
 
 impl<'r, R: Row> FromRow<'r, R> for SystemPrompt
@@ -66,6 +69,27 @@ where
     }
 }
 
+impl<'r, R: Row> FromRow<'r, R> for User
+where
+    &'r str: sqlx::ColumnIndex<R>,
+    i64: Decode<'r, R::Database>,
+    i64: Type<R::Database>,
+    String: Decode<'r, R::Database>,
+    String: Type<R::Database>,
+    bool: Decode<'r, R::Database>,
+    bool: Type<R::Database>,
+{
+    fn from_row(row: &'r R) -> Result<Self, sqlx::Error> {
+        Ok(Self {
+            id: row.try_get::<i64, _>("id")? as _,
+            name: row.try_get("name")?,
+            display_name: row.try_get("display_name")?,
+            is_self: row.try_get("is_self")?,
+            is_bot: row.try_get("is_bot")?,
+        })
+    }
+}
+
 impl<'r, R: Row> FromRow<'r, R> for Message
 where
     &'r str: sqlx::ColumnIndex<R>,
@@ -79,18 +103,13 @@ where
     fn from_row(row: &'r R) -> Result<Self, sqlx::Error> {
         Ok(Self {
             id: row.try_get::<i64, _>("id")? as _,
-            is_self: row.try_get("is_self")?,
-            mentions_self: row.try_get("mentions_self")?,
+            mentions_me: row.try_get("mentions_me")?,
             sender: row.try_get::<i64, _>("sender")? as _,
-            sender_name: row.try_get("sender_name")?,
-            sender_display_name: row.try_get("sender_display_name")?,
             guild: row.try_get::<Option<i64>, _>("guild")?.map(|v| v as _),
             channel: row.try_get::<i64, _>("channel")? as _,
             contents: row.try_get("contents")?,
             reply: row.try_get::<Option<i64>, _>("reply")?.map(|v| v as _),
             time: row.try_get::<i64, _>("time")? as _,
-            reply_sender_name: row.try_get("reply_sender_name")?,
-            reply_contents: row.try_get("reply_contents")?,
         })
     }
 }

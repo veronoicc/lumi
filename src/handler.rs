@@ -82,7 +82,7 @@ impl EventHandler for Handler {
     }
 
     async fn message(&self, ctx: Context, msg: SerenityMessage) {
-        if msg.author.bot {
+        if msg.author == **ctx.cache.current_user() {
             return;
         }
 
@@ -127,36 +127,45 @@ impl EventHandler for Handler {
             .expect("Failed to acquire transaction");
 
         sqlx::query(indoc! {"
-                WITH ensured_channel AS (
-                    INSERT INTO channels (id)
-                    VALUES ($1)
-                    ON CONFLICT (id) DO NOTHING
-                    RETURNING id
-                ),
-                locked AS (
-                    SELECT id
-                    FROM channels
-                    WHERE id = $1
-                    FOR UPDATE
-                )
-                INSERT INTO messages (
-                    id, is_self, mentions_self, sender, sender_name, sender_display_name, guild, channel, contents, reply
-                ) VALUES (
-                    $2, false, $3, $4, $5, $6, $7, $1, $8, (SELECT id FROM messages WHERE id = $9)
-                );
-            "})
-            .bind(msg.channel_id.get() as i64)
-            .bind(msg.id.get() as i64)
-            .bind(mentions_me)
-            .bind(msg.author.id.get() as i64)
-            .bind(&msg.author.name)
-            .bind(msg.author.display_name())
-            .bind(msg.guild_id.map(|id| id.get() as i64))
-            .bind(msg.content_safe(&ctx))
-            .bind(msg.referenced_message.clone().map(|m| m.id.get() as i64))
-            .execute(&mut *transaction)
-            .await
-            .expect("Failed to add message to database");
+            WITH ensured_channel AS (
+                INSERT INTO channels (id)
+                VALUES ($1)
+                ON CONFLICT (id) DO NOTHING
+                RETURNING id
+            ),
+            locked_channel AS (
+                SELECT id
+                FROM channels
+                WHERE id = $1
+                FOR UPDATE
+            ),
+            ensured_user AS (
+                INSERT INTO users (id, name, display_name, is_self, is_bot)
+                VALUES ($5, $6, $7, false, $3)
+                ON CONFLICT (id) DO UPDATE
+                SET 
+                    name = EXCLUDED.name,
+                    display_name = EXCLUDED.display_name
+            )
+            INSERT INTO messages (
+                id, mentions_me, sender, guild, channel, contents, reply
+            ) VALUES (
+                $2, $4, $5, $8, $1, $9, (SELECT id FROM messages WHERE id = $10)
+            );
+        "})
+        .bind(msg.channel_id.get() as i64)
+        .bind(msg.id.get() as i64)
+        .bind(msg.author.bot)
+        .bind(mentions_me)
+        .bind(msg.author.id.get() as i64)
+        .bind(&msg.author.name)
+        .bind(msg.author.display_name())
+        .bind(msg.guild_id.map(|id| id.get() as i64))
+        .bind(msg.content_safe(&ctx))
+        .bind(msg.referenced_message.clone().map(|m| m.id.get() as i64))
+        .execute(&mut *transaction)
+        .await
+        .expect("Failed to add message to database");
 
         if mentions_me || chat_mode == db::ChatMode::FreeResponse {
             if let Err(err) = chatbot::generate(
