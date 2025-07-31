@@ -33,6 +33,13 @@ pub async fn should_reply(
                     return Err(err.into());
                 }
                 context.push(ChatCompletionMessage {
+                    role: MessageRole::assistant,
+                    content: Content::Text(response.content.clone().unwrap_or_default()),
+                    name: None,
+                    tool_calls: None,
+                    tool_call_id: None,
+                });
+                context.push(ChatCompletionMessage {
                     role: MessageRole::system,
                     content: Content::Text(format!("Failed to parse JSON:\n{err:?}\nTry again, and ensure your response is valid JSON")),
                     name: None,
