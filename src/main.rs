@@ -1,5 +1,8 @@
+use std::collections::HashMap;
+
 use openai_api_rs::v1::{api::OpenAIClientBuilder, chat_completion::Reasoning};
-use serde::Deserialize;
+use regex::Regex;
+use serde::{Deserialize, Deserializer};
 use serenity::all::*;
 use sqlx::postgres::PgPoolOptions;
 use tokio::sync::{Mutex, RwLock};
@@ -36,6 +39,20 @@ pub struct ConfigOpenrouter {
 pub struct ConfigModel {
     pub model: String,
     pub reasoning: Option<Reasoning>,
+    #[serde(default, deserialize_with = "read_find_replace")]
+    pub find_replace: Vec<(Regex, String)>,
+}
+
+fn read_find_replace<'d, D: Deserializer<'d>>(
+    deserializer: D,
+) -> Result<Vec<(Regex, String)>, D::Error> {
+    let map: HashMap<String, String> = HashMap::deserialize(deserializer)?;
+    let mut res = Vec::with_capacity(map.len());
+    for (key, value) in map {
+        let regex = Regex::new(&key).expect("Failed to parse regex");
+        res.push((regex, value));
+    }
+    Ok(res)
 }
 
 #[derive(Deserialize)]

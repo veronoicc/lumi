@@ -37,6 +37,11 @@ pub async fn generate<'d>(
         return Ok(());
     }
 
+    let mut content = content.to_string();
+    for (regex, replace) in &config.read().await.openrouter.chat.find_replace {
+        content = regex.replace_all(&content, replace).to_string();
+    }
+
     let Ok(reply) = msg
         .channel_id
         .send_message(
