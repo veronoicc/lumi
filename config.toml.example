@@ -16,6 +16,9 @@ max_attempts = 3
 model = "deepseek/deepseek-chat-v3-0324"
 reasoning = { enabled = false }
 
+[openrouter.chat.find_replace]
+"\n{2,}" = "\n"
+
 # Decides which messages the chatbot should respond to
 [openrouter.social]
 model = "google/gemini-2.5-flash-lite"
